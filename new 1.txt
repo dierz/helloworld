@@ -1,0 +1,350 @@
+include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include<sys/socket.h>
+#include<arpa/inet.h>
+#include<unistd.h>
+#include <mysql.h>
+#include <stdio.h>
+#include <memory.h>
+#include "aes.h"
+void print_hex(BYTE str[], int len)
+{
+        int idx;
+
+        for(idx = 0; idx < len; idx++)
+                printf("%02x", str[idx]);
+}
+int main(int argc , char *argv[])
+{
+        unsigned char keys[10][32]={
+        {0x2A, 0x82, 0x6B, 0x5C, 0xEB, 0x12, 0xE8, 0x2F, 0x33, 0x11, 0x22, 0x29, 0xA0, 0xBD, 0x51, 0x94, 0x85, 0xC6, 0x95, 0x95, 0x78, 0xB4, 0x74, 0x84, 0x94, 0x3A, 0xBA, 0xDF, 0xAE, 0x07, 0x6D, 0xC7},
+        {0x38, 0xC7, 0x3A, 0x24, 0x26, 0x72, 0xAA, 0xA0, 0x6D, 0x7B, 0x79, 0x2E, 0x7C, 0x8D, 0x56, 0x17, 0xB4, 0x8A, 0xFE, 0x00, 0x5E, 0x02, 0xDB, 0x76, 0x0E, 0xE7, 0xC8, 0xB1, 0x58, 0x08, 0x80, 0x2B},
+        {0xA4, 0x5A, 0xF1, 0xD8, 0x82, 0x2D, 0x6D, 0x13, 0x1B, 0xF5, 0x27, 0xFD, 0x3A, 0x45, 0x07, 0x07, 0xE3, 0xA2, 0x2B, 0x23, 0x09, 0x6C, 0x68, 0x35, 0xEC, 0xC4, 0x16, 0x3F, 0xAA, 0xF9, 0x48, 0x65},
+        {0xFA, 0x4D, 0x8A, 0x21, 0x9C, 0x7D, 0x94, 0x87, 0x1C, 0xEB, 0xE4, 0x69, 0xDA, 0xDE, 0x3B, 0xC8, 0xE0, 0xC0, 0xCD, 0xB5, 0xDD, 0x5D, 0x21, 0x37, 0xF2, 0xBB, 0xEC, 0xBE, 0x16, 0x2E, 0x68, 0x22},
+        {0xAD, 0xC2, 0x02, 0xED, 0xBA, 0xE5, 0x6B, 0x66, 0x0D, 0xA4, 0x06, 0x1E, 0x88, 0xFF, 0x5B, 0x0D, 0x88, 0x4E, 0x5E, 0xE9, 0x2B, 0x92, 0x87, 0x9D, 0x2B, 0x53, 0x2F, 0xE0, 0x91, 0xD6, 0x70, 0xED},
+        {0x82, 0xC1, 0xBC, 0x18, 0xDC, 0x4E, 0x0D, 0xFB, 0x55, 0x67, 0xA8, 0x38, 0x56, 0x03, 0xAF, 0xF2, 0x60, 0xDF, 0x36, 0xC8, 0xD0, 0x7F, 0xF7, 0x1B, 0x3A, 0x64, 0xC1, 0x67, 0xB5, 0x8A, 0xD5, 0x37},
+        {0x33, 0x19, 0x9C, 0xC6, 0x43, 0x43, 0x30, 0x39, 0x40, 0x63, 0x94, 0xC3, 0xE9, 0x4F, 0x47, 0x28, 0xA3, 0x3C, 0x80, 0xB1, 0xA0, 0xA8, 0x1D, 0x03, 0xCA, 0xA0, 0xDD, 0x78, 0x8C, 0xA5, 0x45, 0xCB},
+        {0x92, 0x71, 0x05, 0x3C, 0x66, 0xE9, 0xAF, 0x1C, 0xAE, 0xFC, 0x87, 0x6D, 0xEB, 0x33, 0x31, 0xEB, 0x1C, 0x98, 0xC3, 0x79, 0x09, 0x23, 0x96, 0x8B, 0xFB, 0x99, 0xFB, 0xA2, 0x65, 0xB8, 0xAC, 0x9A},
+        {0x1E, 0xC8, 0x31, 0x78, 0x4A, 0x0A, 0xC1, 0xBA, 0x8C, 0x63, 0x03, 0xA3, 0x21, 0xAF, 0x17, 0x97, 0x6F, 0xF1, 0x5B, 0xF3, 0xE2, 0xCB, 0xC1, 0x6F, 0xDA, 0x79, 0x40, 0xCD, 0xED, 0x0D, 0xB7, 0xF5},
+        {0x4F, 0xEC, 0x4F, 0x22, 0x01, 0xB9, 0xA1, 0x12, 0xD7, 0x09, 0xEC, 0xA5, 0x1F, 0xF3, 0x69, 0x4C, 0x81, 0x64, 0x32, 0x74, 0x5D, 0xB8, 0xB8, 0x52, 0x06, 0xC2, 0x9D, 0xD0, 0xC9, 0xF4, 0xCC, 0x7F}
+        };
+   MYSQL *conn;
+   MYSQL_RES *res;
+   MYSQL_ROW row;
+   char lgn[40];
+   char psw[40];
+BYTE enc_buf[16];
+BYTE summ[48];
+   char email[40];
+   char q[300];
+   char  *s;
+   char *token;
+   char *arr[80];
+
+   conn= mysql_init(NULL);
+    int socket_desc , new_socket , c;
+    struct sockaddr_in server , client;
+    int backsock;
+    if (!mysql_real_connect(conn, "localhost","root", "", "Remote App", 0, NULL, 0)) {
+      fprintf(stderr, "%s\n", mysql_error(conn));
+     return 1;
+   }
+    struct sockaddr_in back;
+    char message[300];
+        const char delim[3]=":|*";
+        char *rev;
+
+    //Create socket
+    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+    if (socket_desc == -1)
+    {
+        printf("Could not create socket");
+    }
+
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = INADDR_ANY;
+    server.sin_port = htons( 5000 );
+
+
+    puts("Socket created");
+
+    back.sin_family = AF_INET;
+    back.sin_port = htons( 8499 );
+    //Bind
+    if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0)
+    {
+        puts("bind failed");
+        return 1;
+    }
+    puts("bind done");
+
+    //Listen
+    listen(socket_desc , 3);
+
+    //Accept and incoming connection
+    puts("Waiting for incoming connections...");
+    c = sizeof(struct sockaddr_in);
+    while( (new_socket = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)) )
+    {
+        puts(inet_ntoa(client.sin_addr));
+        if (new_socket < 0)
+    {
+        perror("accept failed");
+        return 1;
+    }
+
+
+printf("Accepted\n");
+
+int n=recv(new_socket, message, 300, 0);
+printf("%s\n", message);
+
+if(strstr(message, "reg")!=NULL){
+        int d=0;
+        token = strtok(message, delim);
+        while(token!=NULL){
+        arr[d]=token;
+        token=strtok(NULL, delim);
+        d++;
+        }
+        snprintf(q, 300, "select login from Users where login like '%s'",arr[0]);
+        printf("%s\n",q);
+
+        if (mysql_query(conn, q)) {
+      fprintf(stderr, "%s\n", mysql_error(conn));
+      return 1;
+   }
+
+   res = mysql_use_result(conn);
+
+   row = mysql_fetch_row(res);
+   if(row == NULL){
+   strcpy(lgn, arr[0]);
+   strcpy(psw, arr[1]);
+   s="RegCorrect";
+   }
+   else{
+   s="RegFailed";
+   }
+}
+else if(strstr(message, "mail")!=NULL){
+        int d=0;
+        token = strtok(message, delim);
+        printf("%s\n", token);
+        while(token!=NULL){
+        arr[d]=token;
+        token=strtok(NULL, delim);
+        d++;
+        }
+        printf("%s  %s\n", arr[0], arr[1]);
+        char *ip=inet_ntoa(client.sin_addr);
+        snprintf(q, 300, "insert into Users (login, password, email, status, ipaddr, port) values ('%s','%s','%s',0,'%s','%s') ",lgn, psw, arr[0],ip, "8500");
+        printf("%s\n",q);
+        if (mysql_query(conn, q)) {
+      fprintf(stderr, "%s\n", mysql_error(conn));
+      return 1;
+        }
+        res = mysql_use_result(conn);
+        s="RegSuccess";
+}
+else if(strstr(message, "finduser")!=NULL){
+                int d=0;
+        token = strtok(message, delim);
+        printf("%s\n", token);
+        while(token!=NULL){
+        arr[d]=token;
+        token=strtok(NULL, delim);
+        d++;
+        }
+                printf("%s  %s\n", arr[0], arr[1]);
+                snprintf(q, 300, "select login, status, last_active from Users where login like '%s' ",arr[0]);
+                printf("%s\n",q);
+                if (mysql_query(conn, q)) {
+                fprintf(stderr, "%s\n", mysql_error(conn));
+                return 1;
+        }
+                res = mysql_use_result(conn);
+                row = mysql_fetch_row(res);
+                if(row == NULL){
+                s="UserNotFound";
+                }
+                else{
+                char kek[50];
+                snprintf(kek,50, "%s:%s*%s|UserFound", row[0], row[1], row[2]);
+                printf("%s\n", kek);
+                s=(char*)kek;
+                printf("%s\n", s);
+                }
+}
+else if(strstr(message, "login")!=NULL){
+                int d=0;
+        token = strtok(message, delim);
+        printf("%s\n", token);
+        while(token!=NULL){
+        arr[d]=token;
+        token=strtok(NULL, delim);
+        d++;
+        }
+                printf("%s  %s  %s\n", arr[0], arr[1], arr[2]);
+                snprintf(q, 300, "select login, password from Users where login like '%s' ",arr[0]);
+                printf("%s\n",q);
+                if (mysql_query(conn, q)) {
+                fprintf(stderr, "%s\n", mysql_error(conn));
+                return 1;
+        }
+                res = mysql_use_result(conn);
+                row = mysql_fetch_row(res);
+                if(row == NULL){
+                s="LoggedFailedLogin";
+                }
+                else if(strcmp(arr[1], row[1])!=0){
+                s="LoggedFailedPassword";
+                }
+                else{
+                char lol[50];
+                snprintf(lol,50, "%s|LoginCorrect", arr[0]);
+                s=(char*)lol;
+                printf("%s\n", lol);
+                printf("%s\n", s);
+                char seq[200];
+                char *ip=inet_ntoa(client.sin_addr);
+                snprintf(seq,200, "update Users set status=1, ipaddr='%s' where login like '%s' ", ip, arr[0]);
+                printf("%s", seq);
+                mysql_free_result(res);
+                if (mysql_query(conn, seq)) {
+                fprintf(stderr, "%s\n", mysql_error(conn));
+                return 1;
+                }
+                res=mysql_use_result(conn);
+                }
+}
+else if(strstr(message, "logout")!=NULL){
+                                int d=0;
+        token = strtok(message, delim);
+        printf("%s\n", token);
+        while(token!=NULL){
+        arr[d]=token;
+        token=strtok(NULL, delim);
+        d++;
+        }
+         printf("%s  %s  %s\n", arr[0], arr[1], arr[2]);
+                snprintf(q, 300, "update Users set status=0 where login like '%s' ",arr[0]);
+                printf("%s\n",q);
+                if (mysql_query(conn, q)) {
+                fprintf(stderr, "%s\n", mysql_error(conn));
+                return 1;
+        }
+                res = mysql_use_result(conn);
+                s="random_data";
+}
+else if(strstr(message, "init")!=NULL){
+                                int d=0;
+        token = strtok(message, delim);
+        printf("%s\n", token);
+        while(token!=NULL){
+        arr[d]=token;
+        token=strtok(NULL, delim);
+        d++;
+        }
+         printf("%s  %s  %s\n", arr[0], arr[1]);
+                char qq[10];
+                strncpy(qq, arr[0], 10);
+                 int key= atoi(qq);
+                printf("%d\n", key);
+                 char *ip=inet_ntoa(client.sin_addr);
+                snprintf(q, 300, "select ip, `key` from Connections where ip like '%s' ",ip);
+                printf("%s\n",q);
+                if (mysql_query(conn, q)) {
+                fprintf(stderr, "%s\n", mysql_error(conn));
+                return 1;
+        }
+                res = mysql_use_result(conn);
+                row = mysql_fetch_row(res);
+                                char c[200];
+                                if(row == NULL){
+                                snprintf(c, 200, "insert into Connections(ip, `key`) values ('%s', '%d') ", ip, key);
+                                }
+                                else{
+                                snprintf(c, 200, "update Connections set `key` = '%d' where ip like '%s' ", key, ip);
+                                }
+                                printf("%s\n", c);
+                                mysql_free_result(res);
+                                if (mysql_query(conn, c)) {
+                fprintf(stderr, "%s\n", mysql_error(conn));
+                return 1;}
+                                res = mysql_use_result(conn);
+                                WORD key_schedule[60];
+                                aes_key_setup(keys[key], key_schedule, 256);
+                                print_hex(keys[key],32);puts("\n");
+                                char *s="random_data22222:asdas:|llllllll";
+                                char w[32];
+                strncpy(w,s, strlen(s));
+char kek[2][16];
+for(int i=0;i<2;i++){
+memcpy(kek[i], w+16*i, 16);
+aes_encrypt(kek[i], enc_buf, key_schedule, 256);
+memcpy(summ+i*16, enc_buf, 16);
+}
+
+                                //printf("%s %d\n", w, sizeof(w));
+
+                                //aes_encrypt(w, enc_buf, key_schedule, 256);
+                                //print_hex(enc_buf, sizeof(enc_buf));puts("\n");
+}
+else if(strstr(message, "connect")!=NULL){
+                                int d=0;
+        token = strtok(message, delim);
+        printf("%s\n", token);
+        while(token!=NULL){
+        arr[d]=token;
+        token=strtok(NULL, delim);
+        d++;
+        }
+         printf("%s  %s  %s\n", arr[0], arr[1], arr[2]);
+                snprintf(q, 300, "select status, ipaddr, port from Users where login like '%s' ",arr[1]);
+                printf("%s\n",q);
+                 if (mysql_query(conn, q)) {
+                fprintf(stderr, "%s\n", mysql_error(conn));
+                return 1;
+                                  }
+                                   res = mysql_use_result(conn);
+                row = mysql_fetch_row(res);
+                                if(row==NULL){
+                                s="ConnectFailedUserNotFound";
+                                }
+                                else if(row[0]==0){
+                                s="ConnectFailedUserOffline";
+                                }
+                                else{
+                                char kek[100];
+                                snprintf(kek, 100, "%s:%s|ConnectSuccess", row[1], row[2]);
+                                s=(char*)kek;
+                                }
+}
+fflush(stdout);
+back.sin_addr.s_addr=inet_addr(inet_ntoa(client.sin_addr));
+backsock = socket(AF_INET , SOCK_STREAM , 0);
+connect(backsock , (struct sockaddr *)&back , sizeof(back));
+send(backsock, s, strlen(s), 0);
+close(backsock);
+
+for(int i=0; i<300; i++){
+message[i]='\0';
+q[i]='\0';
+}
+
+memset(message, 0, 300);
+memset(q, 0, 300);
+mysql_free_result(res);
+
+}
+    if (new_socket<0)
+    {
+        perror("accept failed");
+        return 1;
+    }
+
+mysql_close(conn);
+    return 0;
+}
